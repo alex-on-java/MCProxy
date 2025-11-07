@@ -1,0 +1,49 @@
+{
+  "mcpServers": {
+    "chrome-dev-tools-without-specifying-port": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ],
+      "env": {}
+    },
+    "chrome-dev-tools-with-browser-url": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--browser-url",
+        "http://localhost:9222"
+      ],
+      "env": {}
+    }
+  },
+  "httpServer": {
+    "host": "127.0.0.1",
+    "port": 8081,
+    "corsEnabled": true,
+    "corsOrigins": [
+      "*"
+    ],
+    "middleware": {
+      "client": {
+        "servers": {
+          "chrome-dev-tools-with-browser-url": [
+            {
+              "type": "port_check",
+              "enabled": true,
+              "config": {
+                "host": "localhost",
+                "port": 9222,
+                "timeout_ms": 100
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

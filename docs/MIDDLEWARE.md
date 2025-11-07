@@ -86,8 +86,9 @@ Middleware are configured through the configuration file using a flexible JSON-b
 - **`description_enricher`**: Adds "(via mcproxy)" to tool/prompt/resource descriptions
 - **`tool_search`**: Provides intelligent tool management with selective exposure and search functionality
 
-#### Client Middleware  
+#### Client Middleware
 - **`logging`**: Logs all operations with timing information per server
+- **`port_check`**: Dynamically shows/hides tools based on TCP port accessibility
 - **`tool_filter`**: Filters tools based on configurable regex patterns (allow/disallow)
 - **`security`**: Inspects tool call inputs and blocks calls that match security rules
 
@@ -162,6 +163,73 @@ let middleware = LoggingClientMiddleware::new("my-server".to_string());
 🔧 [my-server] Calling tool: file_search
 ✅ [my-server] Tool call successful
 ```
+
+### Port Check (Client Middleware)
+Dynamically shows or hides tools based on TCP port accessibility. This is particularly useful for MCP servers that require external services (like browsers) to be running.
+
+**Problem it solves:** Some MCP servers (like chrome-devtools-mcp) expose tools even when their underlying service isn't available, leading to runtime failures. Port Check middleware prevents this by hiding tools when the required service port is not accessible.
+
+```rust
+let config = PortCheckConfig {
+    host: "localhost".to_string(),
+    port: 9222,
+    timeout_ms: 100,
+};
+let middleware = PortCheckClientMiddleware::new("chrome-devtools".to_string(), config)?;
+```
+
+**Configuration options:**
+- `host` (required): Hostname or IP address to check
+- `port` (required): TCP port to check (must be non-zero)
+- `timeout_ms` (optional): Connection timeout in milliseconds (default: 100)
+
+**Behavior:**
+- **Port accessible**: Tools are exposed normally
+- **Port not accessible**: All tools from this server are hidden (empty list returned)
+- **Dynamic**: Port is checked on every `list_tools` request for real-time accuracy
+- **No caching**: Ensures immediate response when services start/stop
+
+**Configuration example for chrome-devtools:**
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": ["-y", "chrome-devtools-mcp@latest", "--browser-url", "http://localhost:9222"]
+    }
+  },
+  "httpServer": {
+    "middleware": {
+      "client": {
+        "servers": {
+          "chrome-devtools": [
+            {
+              "type": "port_check",
+              "enabled": true,
+              "config": {
+                "host": "localhost",
+                "port": 9222,
+                "timeout_ms": 100
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+**Output Example:**
+```
+🔌 [chrome-devtools] Port localhost:9222 not accessible - hiding 15 tool(s)
+✅ [chrome-devtools] Port localhost:9222 accessible - exposing 15 tool(s)
+```
+
+**Use cases:**
+- Chrome DevTools MCP servers requiring Chrome to run with `--remote-debugging-port`
+- Database MCP servers requiring a database connection
+- Any MCP server that depends on an external service with a TCP port
 
 ### Tool Filter (Client Middleware)
 Filters tools from individual servers based on configurable regex patterns:
